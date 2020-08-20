@@ -1,0 +1,115 @@
+image: docker:stable
+
+services:
+  - docker:dind
+
+stages:
+  - build
+  - publish
+
+before_script:
+  - docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
+  - (if [[ -n "${DOCKERHUB_USER}" ]]; then docker login -u "${DOCKERHUB_USER}" -p "${DOCKERHUB_PASSWORD}"; fi)
+
+after_script:
+  - docker logout "${CI_REGISTRY}"
+  - (if [[ -n "${DOCKERHUB_USER}" ]]; then docker logout; fi)
+
+.copy-scripts: &copy-scripts
+  - cp -r scripts "${BUILD_PATH}"
+
+.set-build-image-with-commit: &set-build-image-with-commit
+  - BUILD_IMAGE=${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/${IMAGE_NAME}-${CI_COMMIT_SHORT_SHA}
+
+.build-image: &build-image
+  - cd "${BUILD_PATH}"
+  - eval "
+      docker build --pull --force-rm ${BUILD_ARGS}
+        -t "${BUILD_IMAGE}" . >build.log 2>&1
+      " || ((tail -50 build.log | nl); exit 1)
+  - docker push "${BUILD_IMAGE}"
+
+.build-log-artifacts: &build-log-artifacts
+  artifacts:
+    paths:
+      - "${BUILD_PATH}/build.log"
+    expire_in: 6 hrs
+
+.set-publish-gitlab-image: &set-publish-gitlab-image
+  - PUBLISH_IMAGE=${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/${GITLAB_IMAGE}
+
+.set-publish-dockerhub-image: &set-publish-dockerhub-image
+  - PUBLISH_IMAGE=${DOCKERHUB_IMAGE}
+
+.publish-image: &publish-image
+  - docker pull "${BUILD_IMAGE}"
+  - docker tag "${BUILD_IMAGE}" "${PUBLISH_IMAGE}"
+  - docker push "${PUBLISH_IMAGE}"
+
+.nginx-1-19: &nginx-1-19
+  variables:
+    BUILD_PATH: nginx-1.19
+    IMAGE_NAME: nginx:1.19
+    GITLAB_IMAGE: nginx:1.19
+    DOCKERHUB_IMAGE: ${DOCKERHUB_USER}/nginx:1.19
+  rules:
+    - changes:
+        - nginx-1.19/*
+        - scripts/*
+
+build-nginx-1.19:
+  stage: build
+  <<: *nginx-1-19
+  script:
+    - set -x
+    - *copy-scripts
+    - *set-build-image-with-commit
+    - *build-image
+  <<: *build-log-artifacts
+
+publish-nginx-1.19:
+  stage: publish
+  <<: *nginx-1-19
+  script:
+    - set -x
+    - *set-build-image-with-commit
+    - *set-publish-gitlab-image
+    - *publish-image
+    - *set-publish-dockerhub-image
+    - *publish-image
+  needs:
+    - job: build-nginx-1.19
+
+.nginx-1-18: &nginx-1-18
+  variables:
+    BUILD_PATH: nginx-1.18
+    IMAGE_NAME: nginx:1.18
+    GITLAB_IMAGE: nginx:1.18
+    DOCKERHUB_IMAGE: ${DOCKERHUB_USER}/nginx:1.18
+  rules:
+    - changes:
+        - nginx-1.18/*
+        - scripts/*
+
+build-nginx-1.18:
+  stage: build
+  <<: *nginx-1-18
+  script:
+    - set -x
+    - *copy-scripts
+    - *set-build-image-with-commit
+    - *build-image
+  <<: *build-log-artifacts
+
+publish-nginx-1.18:
+  stage: publish
+  <<: *nginx-1-18
+  script:
+    - set -x
+    - *set-build-image-with-commit
+    - *set-publish-gitlab-image
+    - *publish-image
+    - *set-publish-dockerhub-image
+    - *publish-image
+  needs:
+    - job: build-nginx-1.18
