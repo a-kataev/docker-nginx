@@ -2,7 +2,7 @@ ARG NGINX_VERSION=1.19.4
 ARG NJS_VERSION=0.4.4
 ARG NGX_CACHE_PURGE_VERSION=2.3
 
-FROM debian:10.5-slim
+baFROM debian:10.6-slim
 
 ARG NGINX_VERSION
 ARG NJS_VERSION
@@ -67,7 +67,7 @@ RUN set -x && \
   (cd nginx-deb; dpkg-scanpackages . > Packages)
 
 
-FROM debian:10.5-slim
+FROM debian:10.6-slim
 
 LABEL maintainer="Alex Kataev <dlyavsehpisem@gmail.com>"
 
