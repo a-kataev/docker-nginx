@@ -97,7 +97,7 @@ RUN set -x && \
 
 EXPOSE 80
 
-STOPSIGNAL SIGTERM
+STOPSIGNAL SIGQUIT
 
 COPY scripts/docker-entrypoint.sh /
 COPY scripts/docker-entrypoint.d/ /docker-entrypoint.d
